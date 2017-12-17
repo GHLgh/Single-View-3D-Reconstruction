@@ -1,0 +1,175 @@
+<!DOCTYPE HTML> 
+<html lang="en"> 
+<head>
+<title>Tour into Image</title>
+<meta charset="utf-8"> 
+</head>
+
+    
+<script id="shader-vs" type="x-shader/x-vertex">
+    //attribute vec3 aVertexNormal;
+    attribute vec3 aVertexPosition;
+    uniform int isSkybox;
+    uniform mat4 uMVMatrix;
+    uniform mat4 uPMatrix;
+    uniform mat3 uNMatrix;
+    uniform mat4 uLWMatrix;
+    uniform mat4 uEnvCorrectionMatrix;
+    uniform vec3 uLightPosition;
+    uniform vec3 uAmbientLightColor;
+    uniform vec3 uDiffuseLightColor;
+    uniform vec3 uSpecularLightColor;
+    const float shininess = 32.0;
+    varying vec4 vColor;
+    varying vec3 vCoord;
+    varying vec3 vVertexNormal;
+    
+    void main(void) {
+        gl_Position = vec4(aVertexPosition, 1.0); 
+    }
+</script>
+  
+<script id="shader-fs" type="x-shader/x-fragment">
+    precision mediump float;
+    varying vec4 vColor;
+    uniform samplerCube uCubeSampler; 
+    // varying vec2 vTextureCoord;
+    varying vec3 vVertexNormal; 
+    varying vec3 vCoord;
+
+    void main(void) {
+        //gl_FragColor = textureCube(uCubeSampler,vCoord) + vColor;
+        gl_FragColor = vec4(1.0,0.0, 0.0, 1.0);
+    }
+</script>
+    
+<script id="3d-shader-vs" type="x-shader/x-vertex">
+    attribute vec3 aVertexProjPosition;
+    attribute vec3 aVertexPosition;
+    uniform int isSkybox;
+    uniform mat4 uMVMatrix;
+    uniform mat4 uPMatrix;
+    uniform mat3 uNMatrix;
+    uniform mat4 uLWMatrix;
+    uniform mat4 uEnvCorrectionMatrix;
+    uniform vec3 uLightPosition;
+    uniform vec3 uAmbientLightColor;
+    uniform vec3 uDiffuseLightColor;
+    uniform vec3 uSpecularLightColor;
+    const float shininess = 32.0;
+    varying vec4 vColor;
+    varying vec3 vCoord;
+    varying vec2 vTextureCoord;
+    varying vec3 vVertexNormal;
+    
+    
+    void main(void) {
+        gl_Position = uPMatrix * uMVMatrix * vec4(aVertexPosition, 1.0); 
+        if(isSkybox != 1){
+            vColor = vec4(aVertexPosition, 1.0);
+        }
+        else{
+            vColor = vec4(aVertexProjPosition, 1.0);
+        }
+    }
+</script>
+  
+<script id="3d-shader-fs" type="x-shader/x-fragment">
+    precision highp float;
+    uniform mat4 uPMatrix;
+    //precision mediump float;
+    varying vec4 vColor;
+    uniform sampler2D uTexture;
+    uniform sampler2D uFilteredTexture;
+    uniform sampler2D uMask;
+    varying vec2 vTextureCoord;
+    varying vec3 vVertexNormal; 
+    varying vec3 vCoord;
+    
+    uniform int isMask;
+
+    void main(void) {
+        // drawing background
+        if(isMask != 1){
+            gl_FragColor = texture2D(uFilteredTexture, ((uPMatrix * vColor).xy / (uPMatrix * vColor).w + vec2(1,1) )/ vec2(2, 2));
+        }
+        else{
+            //gl_FragColor = vec4(1.0, 0, 0, 1);
+            float trans = texture2D(uMask, ((vColor).xy + vec2(1,1) )/ vec2(2, 2)).r;
+            
+            if(trans < 0.5){
+                gl_FragColor = vec4(0.0,0.0,0.0,0.0);
+            }
+            else{
+                gl_FragColor = vec4(texture2D(uTexture, ((vColor).xy + vec2(1,1))/ vec2(2, 2)).rgb, 1);
+            }
+        }
+    }
+</script>
+    
+<!-- A dummy shader to "display" image -->
+<!-- Cite: https://webglfundamentals.org/webgl/lessons/webgl-2d-drawimage.html -->
+<script id="showImg-vs" type="x-shader/x-vertex">
+    attribute vec4 aPosition;
+    attribute vec2 aTexCoord;
+ 
+    uniform mat4 uMatrix;
+    varying vec2 vTexCoord;
+ 
+    void main() {
+        gl_Position = uMatrix * aPosition;
+        vTexCoord = aTexCoord;
+    }    
+</script>
+    
+<script id="showImg-fs" type="x-shader/x-fragment">
+    precision mediump float;
+    varying vec2 vTexCoord;
+    uniform sampler2D uTexture;
+    uniform sampler2D uMask;
+    uniform int isMask;
+ 
+    void main() {
+        if(isMask != 1){
+            gl_FragColor = texture2D(uTexture, vTexCoord);
+        }
+        else{
+            gl_FragColor = texture2D(uMask, vTexCoord);
+        }
+    }    
+</script>
+
+<script src="gl-matrix-min.js"></script> 
+<script src="webgl-utils.js"></script>
+<script src="singleView.js"></script>   
+<body onload="startup();">
+ <fieldset>
+    <legend>Instructions</legend>
+        In 2D mode (when red lines are shown):<br>
+        Click and drag the control points (corners of rectangle and the vanishing point)<br> to alter <br>
+        I.   the range of rear plane <br>
+        II.  the vanishing point <br>
+        III. if in preprocessed scene, press ENTER to switch to foreground objects selection<br>
+        <br>
+        In 3D mode: <br>
+        Press WSAD to move around; <br>
+        Press Q / E to change the height; <br><br>
+        Press ENTER to switch between modes<br>
+        NOTE: render won't occur until object and images for cube map are loaded  
+ </fieldset>
+ <canvas id="myGLCanvas" width="800" height="600"></canvas>
+<form id="input_form">
+    <fieldset>
+        <legend>Unprocessed Scene</legend>
+        <input type="radio" name="primitive" id="img0" value="0" checked> Perspective Room
+        <input type="radio" name="primitive" id="img1" value="1"> Temple
+        <input type="radio" name="primitive" id="img2" value="2"> Train Tunnel  
+    </fieldset>
+    <fieldset>
+        <legend>Preprocessed Scene</legend>
+        <input type="radio" name="primitive" id="img3" value="3"> Temple with foreground object(s)
+    </fieldset>
+        </form>
+</body>
+
+</html>
